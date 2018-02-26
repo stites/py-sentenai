@@ -151,6 +151,17 @@ class Sentenai(object):
         self.session = requests.Session()
         self.session.headers.update({ 'auth-key': auth_key })
 
+    def _session_get(self, *args, **kwargs):
+        return req_session_handler(lambda: self.session.get(*args, **kwargs))
+
+    def _session_put(self, *args, **kwargs):
+        return req_session_handler(lambda: self.session.put(*args, **kwargs))
+
+    def _session_post(self, *args, **kwargs):
+        return req_session_handler(lambda: self.session.post(*args, **kwargs))
+
+    def _session_delete(self, *args, **kwargs):
+        return req_session_handler(lambda: self.session.delete(*args, **kwargs))
 
     def upload(self, iterable, processes=4, progress=False):
         """Takes a list of events and creates an instance of a Bulk uploader.
@@ -200,7 +211,7 @@ class Sentenai(object):
                      the stream.
         """
         url = self.build_url(stream, eid)
-        resp = self.session.delete(url)
+        resp = self._session_delete(url)
         status_codes(resp)
 
     def get(self, stream, eid=None):
@@ -218,7 +229,7 @@ class Sentenai(object):
         else:
             url = "/".join([self.host, "streams", stream()['name']])
 
-        resp = self.session.get(url)
+        resp = self._session_get(url)
 
         if resp.status_code == 404 and eid is not None:
             raise NotFound(
@@ -254,7 +265,7 @@ class Sentenai(object):
 
         url = "/".join([self.host, "streams", stream()['name'], "fields", field, "stats"])
 
-        resp = self.session.get(url, params=args)
+        resp = self._session_get(url, params=args)
 
         if resp.status_code == 404:
             raise NotFound('The field at "/streams/{}/fields/{}" does not exist'.format(stream()['name'], field))
@@ -288,7 +299,7 @@ class Sentenai(object):
             url = '{host}/streams/{sid}/events/{eid}'.format(
                 sid=stream()['name'], host=self.host, eid=id
             )
-            resp = self.session.put(url, json=jd, headers=headers)
+            resp = self._session_put(url, json=jd, headers=headers)
             if resp.status_code not in [200, 201]:
                 status_codes(resp)
             else:
@@ -297,7 +308,7 @@ class Sentenai(object):
             url = '{host}/streams/{sid}/events'.format(
                 sid=stream._name, host=self.host
             )
-            resp = self.session.post(url, json=jd, headers=headers)
+            resp = self._session_post(url, json=jd, headers=headers)
             if resp.status_code in [200, 201]:
                 return resp.headers['location']
             else:
@@ -316,7 +327,8 @@ class Sentenai(object):
                    metadata
         """
         url = "/".join([self.host, "streams"])
-        resp = self.session.get(url)
+
+        resp = self._session_get(url)
         status_codes(resp)
 
         def filtered(s):
@@ -367,7 +379,7 @@ class Sentenai(object):
              "end",
              iso8601(end)]
         )
-        resp = self.session.get(url)
+        resp = self._session_get(url)
         status_codes(resp)
         return [json.loads(line) for line in resp.text.splitlines()]
 
@@ -390,7 +402,7 @@ class Sentenai(object):
         """
         if isinstance(stream, Stream):
             url = "/".join([self.host, "streams", stream['name'], "fields"])
-            resp = self.session.get(url)
+            resp = self._session_get(url)
             status_codes(resp)
             return resp.json()
         else:
@@ -409,7 +421,7 @@ class Sentenai(object):
         """
         if isinstance(stream, Stream):
             url = "/".join([self.host, "streams", stream['name'], "values"])
-            resp = self.session.get(url)
+            resp = self._session_get(url)
             status_codes(resp)
             return resp.json()
         else:
@@ -424,7 +436,7 @@ class Sentenai(object):
         """
         if isinstance(stream, Stream):
             url = "/".join([self.host, "streams", stream['name'], "newest"])
-            resp = self.session.get(url)
+            resp = self._session_get(url)
             status_codes(resp)
             return {
                     "event": resp.json(),
@@ -444,7 +456,7 @@ class Sentenai(object):
         """
         if isinstance(stream, Stream):
             url = "/".join([self.host, "streams", stream['name'], "oldest"])
-            resp = self.session.get(url)
+            resp = self._session_get(url)
             status_codes(resp)
             return {
                     "event": resp.json(),
@@ -507,7 +519,7 @@ class Cursor(object):
 
         while c is not None:
             url = '{host}/query/{cursor}/events'.format(host=self.client.host, cursor=c)
-            resp = self.client.session.get(url)
+            resp = self.client._session_get(url)
 
             if not resp.ok and retries >= max_retries:
                 raise Exception("failed to get cursor")
@@ -574,7 +586,7 @@ class Cursor(object):
                     url = '{0}/query/{1}/spans'.format(self.client.host, cid)
                 else:
                     url = '{0}/query/{1}/spans?limit={2}'.format(self.client.host, cid, self._limit)
-                r = handle(self.client.session.get(url, headers=self.headers)).json()
+                r = handle(self.client._session_get(url, headers=self.headers)).json()
 
                 for s in r['spans']:
                     if 'start' in s and s['start']:

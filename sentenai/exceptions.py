@@ -1,9 +1,12 @@
+import requests.exceptions as rex
+
 __all__ = [
     'FlareSyntaxError',
     'status_codes',
     'NotFound',
     'AuthenticationError',
-    'SentenaiException'
+    'SentenaiException',
+    'req_session_handler'
 ]
 
 
@@ -58,3 +61,33 @@ def handle(resp):
     elif resp.status_code < 200 or resp.status_code >= 400:
         raise SentenaiException("Something went wrong. Code: %i" % resp.status_code)
     return resp
+
+def req_session_handler(fun):
+    """ A function to catch and handle request exceptions.
+
+    See http://docs.python-requests.org/en/master/_modules/requests/exceptions/
+    for current exception cases in requests.
+    """
+    try:
+        return fun()
+
+    except rex.ProxyError:  # < ConnectionError < RequestException
+        """a Proxy error happened that requests is aware of"""
+        raise
+    except rex.SSLError:    # < ConnectionError < RequestException
+        """an SSL error happened that requests is aware of"""
+        raise
+
+    except rex.ConnectionError:  # < RequestException, Timeout
+        """Could not connect to server"""
+        raise
+
+    except rex.RequestException:  # < IOError
+        """Something in requests went wrong. RequestException is the top-level requests exception class."""
+        raise
+
+    except Exception:
+        """Something requests doesn't handle went wrong"""
+        raise
+
+
