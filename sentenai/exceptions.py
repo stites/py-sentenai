@@ -9,8 +9,8 @@ __all__ = [
 
 class SentenaiException(Exception):
     """Base class for Sentenai expections."""
-
-    pass
+    def __init__(self, *args):
+        super().__init__(*args)
 
 class APIError(SentenaiException):
     def __init__(self, resp):
@@ -18,35 +18,33 @@ class APIError(SentenaiException):
 
 class FlareSyntaxError(SentenaiException):
     """A Flare Syntax Error exception."""
-
-    pass
-
+    def __init__(self, *args):
+        super().__init__(*args)
 
 class AuthenticationError(SentenaiException):
     """An Authentication Error exception."""
-
-    pass
-
+    def __init__(self, msg, details, *args):
+        super().__init__(msg + ": " + details if details else msg)
 
 class NotFound(SentenaiException):
-    """A NotFount Exeption."""
+    """A NotFound Exeption."""
+    def __init__(self, *args):
+        super().__init__(*args)
 
-    pass
-
-def status_codes(resp):
+def status_codes(resp, *args):
     """Throw the proper exception depending on the status code."""
 
     code = resp.status_code
     if code == 401:
-        raise AuthenticationError("Invalid API key")
+        raise AuthenticationError("Invalid API key", *args)
     elif code >= 500:
-        raise SentenaiException("Something went wrong")
+        raise SentenaiException("Something went wrong", *args)
     elif code == 400:
-        raise FlareSyntaxError()
+        raise FlareSyntaxError(*args)
     elif code == 404:
-        raise NotFound()
+        raise NotFound(*args)
     elif code >= 400:
-        raise APIError(resp)
+        raise APIError(resp, *args)
 
 def handle(resp):
     """Handle bad status codes"""
