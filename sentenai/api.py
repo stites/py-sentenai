@@ -551,7 +551,7 @@ class Cursor(object):
                          },
                           ...]
         """
-        self.spans()
+        self.inplace_spans()
         pool = self.pool
         if not pool:
             return json.dumps([])
@@ -564,8 +564,8 @@ class Cursor(object):
     def dataframe(self, *args, **kwargs):
         return self.dataset().dataframe(*args, **kwargs)
 
-    def spans(self, refresh=False):
-        """Get list of spans of time when query conditions are true."""
+    def inplace_spans(self, refresh=False):
+        """Get list of spans of time when query conditions are true, inplace"""
         if refresh or not hasattr(self, "_spans"):
             spans = []
             cid = self.query_id
@@ -587,6 +587,12 @@ class Cursor(object):
                 if self._limit and len(spans) >= self._limit:
                     break
             self._spans = spans
+
+    def spans(self, refresh=False):
+        """Get list of spans of time when query conditions are true, inplace,
+           then return a clean dict of results.
+        """
+        self.inplace_spans(refresh)
         sps = []
         for x in self._spans:
             z = {}
@@ -599,7 +605,7 @@ class Cursor(object):
 
     def stats(self):
         """Get time-based statistics about query results."""
-        self.spans()
+        self.inplace_spans()
         deltas = [sp['end'] - sp['start'] for sp in self._spans if sp.get('start') and sp.get('end')]
 
         if not len(deltas):
@@ -646,7 +652,7 @@ class Cursor(object):
                 return (cursor, mp - w, mp + w)
 
         def iterator(inverted):
-            self.spans()
+            self.inplace_spans()
             if not inverted:
                 spans = self._spans
             elif self._spans:
@@ -798,15 +804,24 @@ class FrameGroup(object):
         """
         Return a generator of dataframes with one dataframe per
         found result.
+
+        drop_stream_names :: bool                  (Default: True)
+            Whether or not to drop the stream name in the prefix of a column.
+
+        name_resolver :: str -> int -> str         (Default: name <> "_" <> str(ix))
+            How to resolve name collisions. Defaults to post-fixing
+            the index of the collision (order is not garunteed).
+
+            FIXME: this is not currently in use.
         """
         drop_prefixes = kwargs.get('drop_stream_names', True)
+        name_resolver = kwargs.get('name_resolver', lambda n, i: n + "_" + str(i))
 
         def cname(stream, path):
             return "{}:{}".format(stream['name'], ".".join(path[1:]))
 
         for df in self.iterator(self.inverted):
             if drop_prefixes:
-                # TODO: Figure out what needs to happen if names overlap
                 z = df[[cname(**p()) if p != ".ts" else p for p in columns]].copy() if columns else df.copy()
                 z.rename(columns={k: k.split(":", 1)[1] for k in z.columns if ":" in k}, inplace=True)
                 yield z
